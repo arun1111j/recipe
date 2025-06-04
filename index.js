@@ -68,16 +68,32 @@ async function initializeDatabase() {
     }
 }
 
+// Get all recipes with pagination and sorting
 app.get('/api/recipes', async(req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const offset = (page - 1) * limit;
+        const orderBy = req.query.orderBy || 'rating';
+        const orderDirection = req.query.orderDirection || 'DESC';
+
+        const validColumns = ['id', 'title', 'cuisine', 'rating', 'prep_time', 'cook_time', 'total_time'];
+        if (!validColumns.includes(orderBy)) {
+            return res.status(400).json({ error: 'Invalid orderBy parameter' });
+        }
+
+        if (orderDirection !== 'ASC' && orderDirection !== 'DESC') {
+            return res.status(400).json({ error: 'Invalid orderDirection parameter' });
+        }
 
         const [countRows] = await pool.query('SELECT COUNT(*) AS total FROM recipes');
         const total = countRows[0].total;
 
-        const [rows] = await pool.query('SELECT * FROM recipes LIMIT ? OFFSET ?', [limit, offset]);
+        const [rows] = await pool.query(
+            `SELECT * FROM recipes 
+             ORDER BY ${orderBy} ${orderDirection} 
+             LIMIT ? OFFSET ?`, [limit, offset]
+        );
 
         const response = {
             page,
@@ -96,6 +112,7 @@ app.get('/api/recipes', async(req, res) => {
     }
 });
 
+// Search recipes with filters
 app.get('/api/recipes/search', async(req, res) => {
     try {
         const { title, cuisine, min_rating, max_rating, min_time, max_time } = req.query;
@@ -144,6 +161,7 @@ app.get('/api/recipes/search', async(req, res) => {
     }
 });
 
+// Get single recipe by ID
 app.get('/api/recipes/:id', async(req, res) => {
     try {
         const { id } = req.params;
@@ -165,6 +183,7 @@ app.get('/api/recipes/:id', async(req, res) => {
     }
 });
 
+// Create new recipe
 app.post('/api/recipes', async(req, res) => {
     try {
         const { title, cuisine, rating, prep_time, cook_time, total_time, description, nutrients, serves } = req.body;
