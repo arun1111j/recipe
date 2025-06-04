@@ -1,5 +1,4 @@
 # Recipe Management API Documentation
-Base URL: http://localhost:3000/api
 
 ## Technologies Used
 Node.js with Express
