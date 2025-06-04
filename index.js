@@ -115,7 +115,7 @@ app.get('/api/recipes', async(req, res) => {
 // Search recipes with filters
 app.get('/api/recipes/search', async(req, res) => {
     try {
-        const { title, cuisine, min_rating, max_rating, min_time, max_time } = req.query;
+        const { title, cuisine, rating, time, calories } = req.query;
         let query = 'SELECT * FROM recipes WHERE 1=1';
         const params = [];
 
@@ -129,32 +129,107 @@ app.get('/api/recipes/search', async(req, res) => {
             params.push(`%${cuisine}%`);
         }
 
-        if (min_rating) {
-            query += ' AND rating >= ?';
-            params.push(parseFloat(min_rating));
+        // Handle rating with operators (>=4.5, <=4.0, =4.5, etc.)
+        if (rating) {
+            const ratingMatch = rating.match(/^(>=|<=|>|<|=)?(.+)$/);
+            if (ratingMatch) {
+                const operator = ratingMatch[1] || '=';
+                const value = parseFloat(ratingMatch[2]);
+
+                if (!isNaN(value)) {
+                    switch (operator) {
+                        case '>=':
+                            query += ' AND rating >= ?';
+                            break;
+                        case '<=':
+                            query += ' AND rating <= ?';
+                            break;
+                        case '>':
+                            query += ' AND rating > ?';
+                            break;
+                        case '<':
+                            query += ' AND rating < ?';
+                            break;
+                        case '=':
+                        default:
+                            query += ' AND rating = ?';
+                            break;
+                    }
+                    params.push(value);
+                }
+            }
         }
 
-        if (max_rating) {
-            query += ' AND rating <= ?';
-            params.push(parseFloat(max_rating));
-        }
+        // Handle time with operators (>=30, <=60, etc.)
+        if (time) {
+            const timeMatch = time.match(/^(>=|<=|>|<|=)?(.+)$/);
+            if (timeMatch) {
+                const operator = timeMatch[1] || '=';
+                const value = parseInt(timeMatch[2]);
 
-        if (min_time) {
-            query += ' AND total_time >= ?';
-            params.push(parseInt(min_time));
-        }
-
-        if (max_time) {
-            query += ' AND total_time <= ?';
-            params.push(parseInt(max_time));
+                if (!isNaN(value)) {
+                    switch (operator) {
+                        case '>=':
+                            query += ' AND total_time >= ?';
+                            break;
+                        case '<=':
+                            query += ' AND total_time <= ?';
+                            break;
+                        case '>':
+                            query += ' AND total_time > ?';
+                            break;
+                        case '<':
+                            query += ' AND total_time < ?';
+                            break;
+                        case '=':
+                        default:
+                            query += ' AND total_time = ?';
+                            break;
+                    }
+                    params.push(value);
+                }
+            }
         }
 
         const [rows] = await pool.query(query, params);
 
-        res.json(rows.map(row => ({
+        let filteredRows = rows.map(row => ({
             ...row,
             nutrients: typeof row.nutrients === 'string' ? JSON.parse(row.nutrients) : row.nutrients
-        })));
+        }));
+
+        // Handle calories with operators (<=400, >=200, etc.) - filter after parsing JSON
+        if (calories) {
+            const caloriesMatch = calories.match(/^(>=|<=|>|<|=)?(.+)$/);
+            if (caloriesMatch) {
+                const operator = caloriesMatch[1] || '=';
+                const value = parseInt(caloriesMatch[2]);
+
+                if (!isNaN(value)) {
+                    filteredRows = filteredRows.filter(row => {
+                        const caloriesStr = (row.nutrients && row.nutrients.calories) ? row.nutrients.calories : '0';
+                        // Extract numeric value from string like "389 kcal"
+                        const recipeCalories = parseInt(caloriesStr.toString().replace(/[^\d]/g, '')) || 0;
+
+                        switch (operator) {
+                            case '>=':
+                                return recipeCalories >= value;
+                            case '<=':
+                                return recipeCalories <= value;
+                            case '>':
+                                return recipeCalories > value;
+                            case '<':
+                                return recipeCalories < value;
+                            case '=':
+                            default:
+                                return recipeCalories === value;
+                        }
+                    });
+                }
+            }
+        }
+
+        res.json(filteredRows);
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: err.message });
