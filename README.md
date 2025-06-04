@@ -18,6 +18,7 @@ node app.js
 It will auto-create the recipes table and insert one sample recipe if empty.
 ```
 ## Database Table: recipes
+```
 Field	Type	Description
 id	INT AUTO_INCREMENT	Primary Key
 title	VARCHAR(255)	Title of the recipe (Required)
@@ -29,7 +30,7 @@ total_time	INT	Total time (prep + cook)
 description	TEXT	Description of the recipe
 nutrients	JSON	Nutritional values
 serves	VARCHAR(50)	Number of servings
-
+```
 ## Endpoints
 ## Request :
 🔹GET http://localhost:3000/api/recipes?page=2&limit=50
